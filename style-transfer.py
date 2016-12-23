@@ -239,4 +239,21 @@ def optimize():
                             [style_features[l] for l in style_layers],
                             batch_size)
 
-        
+        loss = content_loss + style_loss
+
+        train_step = tf.train.AdamOptimizer(learning_rate).minimize(loss)
+        sess.run(tf.initialize_all_variables())
+        for epoch in range(epochs):
+            max_iter, cur_iter = len(content_targets), 0
+            while (cur_iter * batch_size) < max_iter:
+                b_start = cur_iter * batch_size
+                b_end   = b_start + batch_size
+                X_batch = np.zeros(batch_shape, dtype=np.float32)
+                for idx, img_p in enumerate(content_targets[b_start:b_end]):
+                    X_batch[idx] = get_img(
+                                        img_p,
+                                        (256, 256, 3)
+                                    ).astype(np.float32)
+                cur_iter += 1
+                train_step.run(feed_dict={content_image:X_batch})
+                
