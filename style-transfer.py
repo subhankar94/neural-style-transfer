@@ -214,16 +214,16 @@ def optimize():
                                         (-1, features.shape[3]))
 
     with tf.Graph().as_default(), tf.Session() as sess:
-        content_image = tf.placeholder(
+        X_content = tf.placeholder(
                             tf.float32,
                             shape=batch_shape,
-                            name='content_image')
-        content_image_pre = content_image - vgg_mean_pixel
+                            name='X_content')
+        X_content_pre = X_content - vgg_mean_pixel
 
-        content_net = vgg_net(content_image_pre)
+        content_net = vgg_net(X_content_pre)
         content_features[content_layer] = content_net[content_layer]
 
-        preds = inorm_net(content_image/255.0)
+        preds = inorm_net(X_content/255.0)
         preds_pre = preds - vgg_mean_pixel
         net = vgg_net(preds_pre)
 
@@ -255,5 +255,12 @@ def optimize():
                                         (256, 256, 3)
                                     ).astype(np.float32)
                 cur_iter += 1
-                train_step.run(feed_dict={content_image:X_batch})
-                
+                train_step.run(feed_dict={X_content:X_batch})
+                if (int(cur_iter) % print_iter == 0):
+                    metrics = [style_loss, content_loss, loss, preds]
+                    metrics = sess.run(metrics, feed_dict={X_content:X_batch})
+                    _s_loss, _c_loss, _loss, _preds = metrics
+                    losses = (_s_loss, _c_loss, _loss)
+                    saver = tf.train.Saver()
+                    res = saver.save(sess, save_path)
+                    yield(_preds, losses, cur_iter, epoch)
