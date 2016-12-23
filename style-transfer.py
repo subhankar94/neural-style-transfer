@@ -1,9 +1,8 @@
-import tensorflow as tf
-import numpy as np
-import scipy
-import cv2
+import numpy as np, tensorflow as tf, scipy, cv2, sys, os
 from functools import reduce
+from argparse import ArgumentParser
 
+vgg_data_path = ''
 vgg = scipy.io.loadmat(vgg_data_path)
 vgg_mean_pixel = np.mean(vgg['normalization'][0][0][0], axis=(0, 1))
 style_layers = ['relu1_1',
@@ -12,6 +11,24 @@ style_layers = ['relu1_1',
                 'relu4_1',
                 'relu5_1']
 content_layer = 'relu4_2'
+
+def save_img(path, img):
+    img = np.clip(img, 0, 255).astype(np.uint8)
+    scipy.misc.imsave(path, img)
+
+def scale_img(path, scale):
+    scale = float(scale)
+    h, w, d = scipy.misc.imread(path, mode='RGB').shape
+    shape = (int(h*scale), int(w*scale), d)
+    return get_img(path, img_size=new_shape)
+
+def get_img(path, img_size=False):
+    img = scipy.misc.imread(path, mode='RGB')
+    if not (len(img.shape) == 3 and img.shape[2] == 3):
+        img = np.dstack((img, img, img))
+    if img_size != False:
+        img = scipy.misc.imresize(img, img_size)
+    return img
 
 def vgg_conv_layer(input, vgg_weights, idx):
     weights, bias = vgg_weights[idx][0][0][0][0]
@@ -31,7 +48,6 @@ def vgg_pool_layer(input):
 
 def relu_layer(input):
     return tf.nn.relu(input)
-
 
 def vgg_net(input_image):
 
@@ -69,7 +85,6 @@ def vgg_net(input_image):
     # loop through layers to build network
     vgg_net    = {}
     curr_layer = input_image
-
     for idx, layer_name in enumerate(vgg_layers):
         layer_type = name[:4]
         if layer_type == 'conv':
@@ -186,7 +201,12 @@ def gram_matrix_np(x, area, depth):
     G = np.matmul(tf.transpose(F), F)/F.size
     return G
 
-def optimize():
+def optimize(content_targets, style_target,
+             content_weight,  style_weight,
+             print_iter=1000,
+             batch_size=4,
+             save_path='saver/fns.ckpt',
+             learning_rate=1e-3):
 
     style_features   = {}
     content_features = {}
