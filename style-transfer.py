@@ -1,10 +1,21 @@
 import numpy as np, tensorflow as tf, scipy, cv2, sys, os
 from functools import reduce
-from argparse import ArgumentParser
 
-vgg_data_path = ''
+CONTENT_WEIGHT = 7.5e0
+STYLE_WEIGHT   = 1e2
+LEARNING_RATE  = 1e0
+NUM_EPOCHS     = 2
+CHECKPOINT_DIR = 'checkpoints'
+CPOINT_ITER    = 2000
+VGG_PATH       = 'data/imagenet-vgg-verydeep-19.mat'
+TRAIN_PATH     = 'data/train2014'
+BATCH_SIZE     = 4
+DEVICE         = '/gpu:0'
+
+vgg_data_path = VGG_PATH
 vgg = scipy.io.loadmat(vgg_data_path)
-vgg_mean_pixel = np.mean(vgg['normalization'][0][0][0], axis=(0, 1))
+#vgg_mean_pixel = np.mean(vgg['normalization'][0][0][0], axis=(0, 1))
+vgg_mean_pixel = np.array([123.68, 116.779, 103.939]).reshape((1,1,1,3))
 style_layers = ['relu1_1',
                 'relu2_1',
                 'relu3_1',
@@ -29,6 +40,21 @@ def get_img(path, img_size=False):
     if img_size != False:
         img = scipy.misc.imresize(img, img_size)
     return img
+
+def exists(path, msg):
+    assert os.path.exists(path), msg
+
+def list_files(base_path):
+    files = []
+    for (paths, names, files) in os.walk(base_path):
+        files.extend(filenames)
+        break
+
+    return files
+
+def _get_files(img_dir):
+    files = list_files(img_dir)
+    return map(lambda x: os.path.join(img_dir,x), files)
 
 def vgg_conv_layer(input, vgg_weights, idx):
     weights, bias = vgg_weights[idx][0][0][0][0]
@@ -206,7 +232,7 @@ def optimize(content_targets, style_target,
              print_iter=1000,
              batch_size=4,
              save_path='saver/fns.ckpt',
-             learning_rate=1e-3):
+             learning_rate=1e0):
 
     style_features   = {}
     content_features = {}
@@ -284,3 +310,16 @@ def optimize(content_targets, style_target,
                     saver = tf.train.Saver()
                     res = saver.save(sess, save_path)
                     yield(_preds, losses, cur_iter, epoch)
+
+def main():
+    for preds, losses, i, epoch in optimize(
+                        TRAIN_PATH,
+                        style_target,
+                        CONTENT_WEIGHT,
+                        STYLE_WEIGHT):
+        style_loss, content_loss, loss = losses
+        print('Epoch %d, Iter: %d, Loss: %s', %(epoch, i, loss))
+        print('style: %s, content:%s' %(style_loss, content_loss))
+
+if __name__ == '__main__':
+    main()
